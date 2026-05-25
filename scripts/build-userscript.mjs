@@ -15,7 +15,7 @@ const [content, styles] = await Promise.all([
 const metadata = `// ==UserScript==
 // @name         ChatGPT Fold
 // @namespace    https://github.com/chatgpt-fold
-// @version      0.1.0
+// @version      0.1.1
 // @description  Add collapsible heading sections to ChatGPT assistant responses.
 // @author       feiyu.xia
 // @match        https://chatgpt.com/*

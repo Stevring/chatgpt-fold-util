@@ -18,6 +18,7 @@ const BLOCK_ID_ATTR = "data-chatgpt-fold-block-id";
 const GLOBAL_CONTROLS_ID = "cgpt-fold-global-controls";
 const HIDDEN_CLASS = "cgpt-fold-hidden";
 const SCAN_DEBOUNCE_MS = 250;
+const DEBUG_PREFIX = "[ChatGPT Fold]";
 
 const assistantMessageSelector = [
   '[data-message-author-role="assistant"]',
@@ -73,6 +74,19 @@ function getAssistantContentRoots(): HTMLElement[] {
 
     seen.add(messageContainer);
     roots.push(getContentRoot(roleElement));
+  }
+
+  if (roots.length > 0) {
+    return roots;
+  }
+
+  for (const markdownRoot of document.querySelectorAll<HTMLElement>("main .markdown, main .prose")) {
+    if (seen.has(markdownRoot) || isManagedNode(markdownRoot)) {
+      continue;
+    }
+
+    seen.add(markdownRoot);
+    roots.push(markdownRoot);
   }
 
   return roots;
@@ -233,12 +247,12 @@ function processMessage(contentRoot: HTMLElement): void {
 }
 
 function runScan(): void {
+  ensureGlobalControls();
+
   const roots = getAssistantContentRoots();
   for (const root of roots) {
     processMessage(root);
   }
-
-  ensureGlobalControls();
 }
 
 function scheduleScan(): void {
@@ -327,6 +341,10 @@ function init(): void {
     return;
   }
 
+  console.info(`${DEBUG_PREFIX} userscript started`, {
+    url: location.href,
+    readyState: document.readyState
+  });
   runScan();
   observePage();
 }

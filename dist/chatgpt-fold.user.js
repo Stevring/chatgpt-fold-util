@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Fold
 // @namespace    https://github.com/chatgpt-fold
-// @version      0.1.0
+// @version      0.1.1
 // @description  Add collapsible heading sections to ChatGPT assistant responses.
 // @author       feiyu.xia
 // @match        https://chatgpt.com/*
@@ -27,6 +27,7 @@
   const GLOBAL_CONTROLS_ID = "cgpt-fold-global-controls";
   const HIDDEN_CLASS = "cgpt-fold-hidden";
   const SCAN_DEBOUNCE_MS = 250;
+  const DEBUG_PREFIX = "[ChatGPT Fold]";
   const assistantMessageSelector = [
       '[data-message-author-role="assistant"]',
       '[data-testid^="conversation-turn-"] [data-message-author-role="assistant"]'
@@ -69,6 +70,16 @@
           }
           seen.add(messageContainer);
           roots.push(getContentRoot(roleElement));
+      }
+      if (roots.length > 0) {
+          return roots;
+      }
+      for (const markdownRoot of document.querySelectorAll("main .markdown, main .prose")) {
+          if (seen.has(markdownRoot) || isManagedNode(markdownRoot)) {
+              continue;
+          }
+          seen.add(markdownRoot);
+          roots.push(markdownRoot);
       }
       return roots;
   }
@@ -192,11 +203,11 @@
       });
   }
   function runScan() {
+      ensureGlobalControls();
       const roots = getAssistantContentRoots();
       for (const root of roots) {
           processMessage(root);
       }
-      ensureGlobalControls();
   }
   function scheduleScan() {
       if (scanTimer !== undefined) {
@@ -269,6 +280,10 @@
           window.addEventListener("DOMContentLoaded", init, { once: true });
           return;
       }
+      console.info(`${DEBUG_PREFIX} userscript started`, {
+          url: location.href,
+          readyState: document.readyState
+      });
       runScan();
       observePage();
   }
