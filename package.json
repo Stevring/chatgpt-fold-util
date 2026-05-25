@@ -1,0 +1,16 @@
+{
+  "name": "chatgpt-fold",
+  "version": "0.1.0",
+  "description": "A Tampermonkey userscript that adds folding controls to ChatGPT assistant responses.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc && node scripts/build-userscript.mjs",
+    "watch": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
