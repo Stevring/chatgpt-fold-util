@@ -116,6 +116,39 @@ function resetMessage(contentRoot: HTMLElement): void {
   processedMessages.delete(contentRoot);
 }
 
+function getUniqueContentNodes(blocks: FoldBlock[]): HTMLElement[] {
+  const nodes: HTMLElement[] = [];
+  const seen = new Set<HTMLElement>();
+
+  for (const block of blocks) {
+    for (const node of block.contentNodes) {
+      if (seen.has(node)) {
+        continue;
+      }
+
+      seen.add(node);
+      nodes.push(node);
+    }
+  }
+
+  return nodes;
+}
+
+function renderMessage(processedMessage: ProcessedMessage): void {
+  for (const block of processedMessage.blocks) {
+    block.toggle.setAttribute("aria-expanded", String(!block.collapsed));
+    block.toggle.setAttribute("aria-label", block.collapsed ? "展开此段" : "折叠此段");
+  }
+
+  for (const node of getUniqueContentNodes(processedMessage.blocks)) {
+    const hiddenByCollapsedBlock = processedMessage.blocks.some(
+      (block) => block.collapsed && block.contentNodes.includes(node)
+    );
+
+    node.classList.toggle(HIDDEN_CLASS, hiddenByCollapsedBlock);
+  }
+}
+
 function snapshotCollapsedStates(contentRoot: HTMLElement): Map<string, boolean> {
   const previous = processedMessages.get(contentRoot);
   const states = new Map<string, boolean>();
@@ -167,8 +200,6 @@ function createToggle(block: Omit<FoldBlock, "toggle" | "collapsed">): HTMLButto
   toggle.className = "cgpt-fold-toggle";
   toggle.innerHTML =
     '<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M5.2 3.8 9.4 8l-4.2 4.2 1.4 1.4L12.2 8 6.6 2.4 5.2 3.8z" fill="currentColor"/></svg>';
-  toggle.setAttribute("aria-label", "折叠此段");
-  toggle.setAttribute("aria-expanded", "true");
   toggle.dataset.foldBlockId = block.id;
 
   toggle.addEventListener("click", (event) => {
@@ -176,12 +207,16 @@ function createToggle(block: Omit<FoldBlock, "toggle" | "collapsed">): HTMLButto
     event.stopPropagation();
 
     const processedMessage = findProcessedMessage(toggle);
-    const currentBlock = processedMessage?.blocks.find((candidate) => candidate.id === block.id);
+    if (!processedMessage) {
+      return;
+    }
+
+    const currentBlock = processedMessage.blocks.find((candidate) => candidate.id === block.id);
     if (!currentBlock) {
       return;
     }
 
-    setBlockCollapsed(currentBlock, !currentBlock.collapsed);
+    setBlockCollapsed(processedMessage, currentBlock, !currentBlock.collapsed);
   });
 
   return toggle;
@@ -191,14 +226,13 @@ function attachToggle(heading: HTMLElement, toggle: HTMLButtonElement): void {
   heading.appendChild(toggle);
 }
 
-function setBlockCollapsed(block: FoldBlock, collapsed: boolean): void {
+function setBlockCollapsed(
+  processedMessage: ProcessedMessage,
+  block: FoldBlock,
+  collapsed: boolean
+): void {
   block.collapsed = collapsed;
-  block.toggle.setAttribute("aria-expanded", String(!collapsed));
-  block.toggle.setAttribute("aria-label", collapsed ? "展开此段" : "折叠此段");
-
-  for (const node of block.contentNodes) {
-    node.classList.toggle(HIDDEN_CLASS, collapsed);
-  }
+  renderMessage(processedMessage);
 }
 
 function findProcessedMessage(element: HTMLElement): ProcessedMessage | undefined {
@@ -228,10 +262,9 @@ function processMessage(contentRoot: HTMLElement): void {
     const block: FoldBlock = {
       ...rawBlock,
       toggle,
-      collapsed: false
+      collapsed
     };
 
-    setBlockCollapsed(block, collapsed);
     blocks.push(block);
   }
 
@@ -240,10 +273,12 @@ function processMessage(contentRoot: HTMLElement): void {
   }
 
   contentRoot.setAttribute(MESSAGE_PROCESSED_ATTR, "true");
-  processedMessages.set(contentRoot, {
+  const processedMessage: ProcessedMessage = {
     container: contentRoot,
     blocks
-  });
+  };
+  processedMessages.set(contentRoot, processedMessage);
+  renderMessage(processedMessage);
 }
 
 function runScan(): void {
@@ -275,8 +310,10 @@ function setAll(action: FoldAction): void {
     }
 
     for (const block of processedMessage.blocks) {
-      setBlockCollapsed(block, collapsed);
+      block.collapsed = collapsed;
     }
+
+    renderMessage(processedMessage);
   }
 }
 

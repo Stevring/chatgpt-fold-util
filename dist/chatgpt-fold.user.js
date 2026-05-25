@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Fold
 // @namespace    https://github.com/chatgpt-fold
-// @version      0.1.1
+// @version      0.1.2
 // @description  Add collapsible heading sections to ChatGPT assistant responses.
 // @author       feiyu.xia
 // @match        https://chatgpt.com/*
@@ -101,6 +101,30 @@
       contentRoot.removeAttribute(MESSAGE_PROCESSED_ATTR);
       processedMessages.delete(contentRoot);
   }
+  function getUniqueContentNodes(blocks) {
+      const nodes = [];
+      const seen = new Set();
+      for (const block of blocks) {
+          for (const node of block.contentNodes) {
+              if (seen.has(node)) {
+                  continue;
+              }
+              seen.add(node);
+              nodes.push(node);
+          }
+      }
+      return nodes;
+  }
+  function renderMessage(processedMessage) {
+      for (const block of processedMessage.blocks) {
+          block.toggle.setAttribute("aria-expanded", String(!block.collapsed));
+          block.toggle.setAttribute("aria-label", block.collapsed ? "展开此段" : "折叠此段");
+      }
+      for (const node of getUniqueContentNodes(processedMessage.blocks)) {
+          const hiddenByCollapsedBlock = processedMessage.blocks.some((block) => block.collapsed && block.contentNodes.includes(node));
+          node.classList.toggle(HIDDEN_CLASS, hiddenByCollapsedBlock);
+      }
+  }
   function snapshotCollapsedStates(contentRoot) {
       const previous = processedMessages.get(contentRoot);
       const states = new Map();
@@ -140,31 +164,28 @@
       toggle.className = "cgpt-fold-toggle";
       toggle.innerHTML =
           '<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M5.2 3.8 9.4 8l-4.2 4.2 1.4 1.4L12.2 8 6.6 2.4 5.2 3.8z" fill="currentColor"/></svg>';
-      toggle.setAttribute("aria-label", "折叠此段");
-      toggle.setAttribute("aria-expanded", "true");
       toggle.dataset.foldBlockId = block.id;
       toggle.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
           const processedMessage = findProcessedMessage(toggle);
-          const currentBlock = processedMessage?.blocks.find((candidate) => candidate.id === block.id);
+          if (!processedMessage) {
+              return;
+          }
+          const currentBlock = processedMessage.blocks.find((candidate) => candidate.id === block.id);
           if (!currentBlock) {
               return;
           }
-          setBlockCollapsed(currentBlock, !currentBlock.collapsed);
+          setBlockCollapsed(processedMessage, currentBlock, !currentBlock.collapsed);
       });
       return toggle;
   }
   function attachToggle(heading, toggle) {
       heading.appendChild(toggle);
   }
-  function setBlockCollapsed(block, collapsed) {
+  function setBlockCollapsed(processedMessage, block, collapsed) {
       block.collapsed = collapsed;
-      block.toggle.setAttribute("aria-expanded", String(!collapsed));
-      block.toggle.setAttribute("aria-label", collapsed ? "展开此段" : "折叠此段");
-      for (const node of block.contentNodes) {
-          node.classList.toggle(HIDDEN_CLASS, collapsed);
-      }
+      renderMessage(processedMessage);
   }
   function findProcessedMessage(element) {
       const message = element.closest(`[${MESSAGE_PROCESSED_ATTR}]`);
@@ -188,19 +209,20 @@
           const block = {
               ...rawBlock,
               toggle,
-              collapsed: false
+              collapsed
           };
-          setBlockCollapsed(block, collapsed);
           blocks.push(block);
       }
       if (blocks.length === 0) {
           return;
       }
       contentRoot.setAttribute(MESSAGE_PROCESSED_ATTR, "true");
-      processedMessages.set(contentRoot, {
+      const processedMessage = {
           container: contentRoot,
           blocks
-      });
+      };
+      processedMessages.set(contentRoot, processedMessage);
+      renderMessage(processedMessage);
   }
   function runScan() {
       ensureGlobalControls();
@@ -226,8 +248,9 @@
               continue;
           }
           for (const block of processedMessage.blocks) {
-              setBlockCollapsed(block, collapsed);
+              block.collapsed = collapsed;
           }
+          renderMessage(processedMessage);
       }
   }
   function ensureGlobalControls() {
