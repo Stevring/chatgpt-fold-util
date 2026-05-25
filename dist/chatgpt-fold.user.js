@@ -8,6 +8,8 @@
 // @match        https://chat.openai.com/*
 // @run-at       document-idle
 // @grant        none
+// @updateURL    https://raw.githubusercontent.com/Stevring/chatgpt-fold-util/main/dist/chatgpt-fold.user.js
+// @downloadURL  https://raw.githubusercontent.com/Stevring/chatgpt-fold-util/main/dist/chatgpt-fold.user.js
 // @license      MIT
 // ==/UserScript==
 
